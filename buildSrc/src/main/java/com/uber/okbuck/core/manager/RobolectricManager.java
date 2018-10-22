@@ -1,12 +1,15 @@
 package com.uber.okbuck.core.manager;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.uber.okbuck.OkBuckGradlePlugin;
+import com.uber.okbuck.composer.base.BuckRuleComposer;
 import com.uber.okbuck.core.dependency.DependencyCache;
+import com.uber.okbuck.core.dependency.ExternalDependency;
 import com.uber.okbuck.core.util.FileUtil;
 import com.uber.okbuck.core.util.ProjectUtil;
-import java.io.IOException;
-import java.nio.file.Files;
+import com.uber.okbuck.template.config.SymlinkBuckFile;
+import com.uber.okbuck.template.core.Rule;
 import java.nio.file.Path;
 import java.util.EnumSet;
 import java.util.Set;
@@ -20,7 +23,7 @@ public final class RobolectricManager {
   public static final String ROBOLECTRIC_CACHE = OkBuckGradlePlugin.WORKSPACE_PATH + "/robolectric";
 
   private final Project rootProject;
-  @Nullable private ImmutableSet<String> dependencies;
+  @Nullable private ImmutableSet<ExternalDependency> dependencies;
 
   public RobolectricManager(Project rootProject) {
     this.rootProject = rootProject;
@@ -49,23 +52,18 @@ public final class RobolectricManager {
   }
 
   public void finalizeDependencies() {
-    if (dependencies != null) {
+    if (dependencies != null && dependencies.size() > 0) {
       Path robolectricCache = rootProject.file(ROBOLECTRIC_CACHE).toPath();
       FileUtil.deleteQuietly(robolectricCache);
       robolectricCache.toFile().mkdirs();
 
-      dependencies.forEach(
-          dependency -> {
-            Path fromPath = rootProject.file(dependency).toPath();
-            Path toPath =
-                robolectricCache.resolve(fromPath.getFileName().toString().replace("--", "-"));
+      Rule filegroup =
+          new SymlinkBuckFile()
+              .targets(BuckRuleComposer.external(dependencies))
+              .base("")
+              .name("robolectric_cache");
 
-            try {
-              Files.createLink(toPath, fromPath.toRealPath());
-            } catch (IOException e) {
-              throw new RuntimeException(e);
-            }
-          });
+      BuckRuleComposer.composeBuckFile(robolectricCache, ImmutableList.of(filegroup));
     }
   }
 

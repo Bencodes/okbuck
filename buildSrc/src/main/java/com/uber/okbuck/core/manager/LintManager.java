@@ -5,11 +5,12 @@ import com.google.common.collect.ImmutableSet;
 import com.uber.okbuck.OkBuckGradlePlugin;
 import com.uber.okbuck.composer.base.BuckRuleComposer;
 import com.uber.okbuck.core.dependency.DependencyCache;
+import com.uber.okbuck.core.dependency.ExternalDependency;
 import com.uber.okbuck.core.model.base.RuleType;
 import com.uber.okbuck.core.util.FileUtil;
 import com.uber.okbuck.core.util.ProjectUtil;
 import com.uber.okbuck.template.core.Rule;
-import com.uber.okbuck.template.java.Prebuilt;
+import com.uber.okbuck.template.java.NativePrebuilt;
 import com.uber.okbuck.template.jvm.JvmBinaryRule;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -37,7 +38,7 @@ public final class LintManager {
   private final Project project;
   private final String lintBuckFile;
 
-  private Set<String> dependencies;
+  private Set<ExternalDependency> dependencies;
 
   @SuppressWarnings("NullAway")
   public LintManager(Project project, String lintBuckFile) {
@@ -85,7 +86,7 @@ public final class LintManager {
   }
 
   public void finalizeDependencies() {
-    if (dependencies != null) {
+    if (dependencies != null && dependencies.size() > 0) {
       new JvmBinaryRule()
           .mainClassName("")
           .excludes(LINT_BINARY_EXCLUDES)
@@ -104,7 +105,7 @@ public final class LintManager {
               .defaultVisibility());
 
       rulesBuilder.add(
-          new Prebuilt()
+          new NativePrebuilt()
               .prebuiltType(RuleType.PREBUILT_JAR.getProperties().get(0))
               .prebuilt(LINT_DUMMY_JAR)
               .ruleType(RuleType.PREBUILT_JAR.getBuckName())

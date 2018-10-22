@@ -1,17 +1,18 @@
 package com.uber.okbuck.core.manager;
 
+import static com.uber.okbuck.core.dependency.BaseExternalDependency.AAR;
+import static com.uber.okbuck.core.dependency.BaseExternalDependency.JAR;
+
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.LinkedHashMultimap;
-import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.SetMultimap;
-import com.uber.okbuck.OkBuckGradlePlugin;
+import com.uber.okbuck.composer.base.BuckRuleComposer;
 import com.uber.okbuck.composer.java.PrebuiltRuleComposer;
 import com.uber.okbuck.core.dependency.DependencyUtils;
 import com.uber.okbuck.core.dependency.ExternalDependency;
 import com.uber.okbuck.core.dependency.VersionlessDependency;
-import com.uber.okbuck.core.util.FileUtil;
 import com.uber.okbuck.core.util.ProjectUtil;
 import com.uber.okbuck.extension.ExternalDependenciesExtension;
 import com.uber.okbuck.template.core.Rule;
@@ -36,7 +37,6 @@ public class DependencyManager {
   private static final Logger LOG = LoggerFactory.getLogger(DependencyManager.class);
 
   private final Project project;
-  private final String cacheDirName;
   private final ExternalDependenciesExtension extension;
 
   private final SetMultimap<VersionlessDependency, ExternalDependency> originalDependencyMap =
@@ -44,11 +44,9 @@ public class DependencyManager {
 
   private final HashMap<VersionlessDependency, Boolean> skipPrebuiltDependencyMap = new HashMap<>();
 
-  public DependencyManager(
-      Project rootProject, String cacheDirName, ExternalDependenciesExtension extension) {
+  public DependencyManager(Project rootProject, ExternalDependenciesExtension extension) {
 
     this.project = rootProject;
-    this.cacheDirName = cacheDirName;
     this.extension = extension;
   }
 
@@ -64,19 +62,11 @@ public class DependencyManager {
     }
   }
 
-  public String getCacheDirName() {
-    return this.cacheDirName;
-  }
-
   public void finalizeDependencies() {
     Map<VersionlessDependency, Collection<ExternalDependency>> filteredDependencyMap =
         filterDependencies();
     validateDependencies(filteredDependencyMap);
     processDependencies(filteredDependencyMap);
-  }
-
-  private File getCacheDir() {
-    return project.getRootProject().file(cacheDirName);
   }
 
   private Map<VersionlessDependency, Collection<ExternalDependency>> filterDependencies() {
@@ -180,7 +170,7 @@ public class DependencyManager {
                   String version = dependency.getVersion();
                   return version.endsWith("+") || version.endsWith("-SNAPSHOT");
                 })
-            .map(ExternalDependency::getCacheName)
+            .map(ExternalDependency::getTargetName)
             .collect(Collectors.joining("\n"));
 
     if (!changingDeps.isEmpty()) {
@@ -197,7 +187,8 @@ public class DependencyManager {
 
   private void processDependencies(
       Map<VersionlessDependency, Collection<ExternalDependency>> dependencyMap) {
-    File cacheDir = getCacheDir();
+    Path rootPath = project.getRootDir().toPath();
+    File cacheDir = rootPath.resolve(extension.getCache()).toFile();
     if (cacheDir.exists()) {
       try {
         FileUtils.deleteDirectory(cacheDir);
@@ -216,48 +207,32 @@ public class DependencyManager {
             .stream()
             .flatMap(Collection::stream)
             .collect(
-                Collectors.groupingBy(
-                    dependency -> cacheDir.toPath().resolve(dependency.getBasePath())));
+                Collectors.groupingBy(dependency -> rootPath.resolve(dependency.getTargetPath())));
 
     groupToDependencyMap.forEach(
         (basePath, dependencies) -> {
-          basePath.toFile().mkdirs();
-          copyOrCreateSymlinks(basePath, dependencies);
+          ImmutableList.Builder<ExternalDependency> prebuiltDependencies = ImmutableList.builder();
+          ImmutableList.Builder<ExternalDependency> httpFileDependencies = ImmutableList.builder();
 
-          List<ExternalDependency> filteredDependencies =
-              dependencies
-                  .stream()
-                  .filter(
-                      dependency ->
-                          !skipPrebuiltDependencyMap.getOrDefault(
-                              dependency.getVersionless(), false))
-                  .collect(Collectors.toList());
-          composeBuckFile(basePath, filteredDependencies);
+          dependencies.forEach(
+              dependency -> {
+                if (isPrebuiltDependency(dependency)) {
+                  prebuiltDependencies.add(dependency);
+                } else {
+                  httpFileDependencies.add(dependency);
+                }
+              });
+
+          ImmutableList.Builder<Rule> rulesBuilder = ImmutableList.builder();
+          rulesBuilder.addAll(PrebuiltRuleComposer.compose(httpFileDependencies.build()));
+          rulesBuilder.addAll(PrebuiltRuleComposer.compose(prebuiltDependencies.build()));
+
+          BuckRuleComposer.composeBuckFile(basePath, rulesBuilder.build());
         });
   }
 
-  private void copyOrCreateSymlinks(Path path, Collection<ExternalDependency> dependencies) {
-    SetMultimap<VersionlessDependency, ExternalDependency> nameToDependencyMap =
-        MultimapBuilder.hashKeys().hashSetValues().build();
-    dependencies.forEach(
-        dependency -> nameToDependencyMap.put(dependency.getVersionless(), dependency));
-
-    dependencies.forEach(
-        dependency -> {
-          FileUtil.symlink(
-              path.resolve(dependency.getDependencyFileName()),
-              dependency.getRealDependencyFile().toPath());
-
-          Path sourceJar = dependency.getRealSourceFilePath(project);
-          if (sourceJar != null) {
-            FileUtil.symlink(path.resolve(dependency.getSourceFileName()), sourceJar);
-          }
-        });
-  }
-
-  private static void composeBuckFile(Path path, Collection<ExternalDependency> dependencies) {
-    List<Rule> rules = PrebuiltRuleComposer.compose(dependencies);
-    File buckFile = path.resolve(OkBuckGradlePlugin.BUCK).toFile();
-    FileUtil.writeToBuckFile(rules, buckFile);
+  private boolean isPrebuiltDependency(ExternalDependency dependency) {
+    return !skipPrebuiltDependencyMap.getOrDefault(dependency.getVersionless(), false)
+        && (dependency.getPackaging().equals(AAR) || dependency.getPackaging().equals(JAR));
   }
 }

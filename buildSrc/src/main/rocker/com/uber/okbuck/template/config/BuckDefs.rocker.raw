@@ -71,6 +71,7 @@ def okbuck_aidl(
 def toLocation(dep):
     return "$(location {})".format(dep)
 
+
 def okbuck_lint(
         variant,
         manifest,
@@ -133,8 +134,10 @@ def okbuck_lint(
         bash = bash
     )
 
+
 def shellquote(s):
     return "'" + s.replace("'", "'\\''") + "'"
+
 
 def okbuck_manifest(
         name,
@@ -177,6 +180,7 @@ def okbuck_manifest(
         type = 'okbuck_manifest',
         cmd = ' '.join(cmds),
     )
+
 
 def isLintEnabled(manifest):
 @if(enableLint) {
@@ -231,6 +235,7 @@ def okbuck_android_library(
             lint_options = lint_options,
         )
 
+
 def okbuck_keystore(
     name,
     storeFile,
@@ -252,3 +257,57 @@ def okbuck_keystore(
         properties = ':' + properties_rule,
         visibility = ['PUBLIC'],
     )
+
+def okbuck_prebuilt(
+    name,
+    maven_coords,
+    sha256,
+    sources_maven_coords=None,
+    sources_sha256=None,
+    visibility=None,
+    ):
+    if visibility == None:
+        visibility = ['PUBLIC']
+
+    prebuilt_type = maven_coords.split(':')[2]
+
+    name_without_type = name
+    if prebuilt_type in name:
+        name_without_type = name[:name.index('.' + prebuilt_type)]
+
+    prebuilt_file_name = name + '__downloaded'
+    http_file(
+        name = prebuilt_file_name,
+        urls = [ 'mvn:' + maven_coords ],
+        out = name,
+        sha256 = sha256,
+    )
+
+    prebuilt_sources_file_name = None
+    if sources_maven_coords != None:
+        prebuilt_sources_file_name = prebuilt_file_name + '_sources'
+        http_file(
+            name = prebuilt_sources_file_name,
+            urls = [ 'mvn:' + sources_maven_coords ],
+            out = name_without_type + '-sources.jar',
+            sha256 = sources_sha256,
+        )
+
+    if prebuilt_type == 'aar':
+        android_prebuilt_aar(
+            name = name,
+            aar = ':' + prebuilt_file_name,
+            source_jar = ':' + prebuilt_sources_file_name if sources_maven_coords != None else None,
+            maven_coords = maven_coords,
+            visibility = visibility,
+        )
+    elif prebuilt_type == 'jar':
+        prebuilt_jar(
+            name = name,
+            binary_jar = ':' + prebuilt_file_name,
+            source_jar = ':' + prebuilt_sources_file_name if sources_maven_coords != None else None,
+            maven_coords = maven_coords,
+            visibility = visibility,
+        )
+    else:
+        raise Exception("okbuck_prebuilt not supported for type {}".format(prebuilt_type))

@@ -7,7 +7,6 @@ import com.uber.okbuck.core.util.ProjectUtil;
 import com.uber.okbuck.extension.ExternalDependenciesExtension;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -81,7 +80,7 @@ public class DependencyCache {
 
     if (!resolveOnly && fetchSources) {
       LOG.info("Fetching sources for {}", dependency);
-      dependency.getRealSourceFilePath(rootProject);
+      dependency.computeSourceFilePath(rootProject);
     }
 
     return dependency;
@@ -89,12 +88,6 @@ public class DependencyCache {
 
   public final ExternalDependency get(ExternalDependency externalDependency) {
     return get(externalDependency, false);
-  }
-
-  public String getPath(ExternalDependency dependency) {
-    return Paths.get(dependencyManager.getCacheDirName())
-        .resolve(dependency.getDependencyFilePath())
-        .toString();
   }
 
   /**
@@ -106,7 +99,7 @@ public class DependencyCache {
   public Set<String> getAnnotationProcessors(ExternalDependency externalDependency) {
     ExternalDependency dependency =
         forcedDeps.getOrDefault(externalDependency.getVersionless(), externalDependency);
-    String key = dependency.getCacheName();
+    String key = dependency.getTargetName();
 
     try {
       String processors =
@@ -164,7 +157,7 @@ public class DependencyCache {
     return content;
   }
 
-  public Set<String> build(Configuration configuration) {
+  public Set<ExternalDependency> build(Configuration configuration) {
     return build(Collections.singleton(configuration));
   }
 
@@ -175,7 +168,7 @@ public class DependencyCache {
    *
    * @param configurations The set of configurations to materialize into the dependency cache
    */
-  private Set<String> build(Set<Configuration> configurations) {
+  private Set<ExternalDependency> build(Set<Configuration> configurations) {
     ExternalDependenciesExtension externalDependenciesExtension =
         ProjectUtil.getOkBuckExtension(rootProject).getExternalDependenciesExtension();
 
@@ -186,7 +179,6 @@ public class DependencyCache {
                 DependencyUtils.resolveExternal(configuration, externalDependenciesExtension))
         .flatMap(Collection::stream)
         .map(dependency -> get(dependency, true))
-        .map(this::getPath)
         .collect(Collectors.toSet());
   }
 

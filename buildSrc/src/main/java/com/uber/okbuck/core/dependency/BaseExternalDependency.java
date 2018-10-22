@@ -14,8 +14,11 @@ import org.gradle.api.internal.artifacts.dependencies.DefaultExternalModuleDepen
 
 @AutoValue
 public abstract class BaseExternalDependency {
+  public static final String AAR = "aar";
+  public static final String JAR = "jar";
 
-  private static final String CACHE_DELIMITER = "-";
+  private static final String NAME_DELIMITER = "-";
+  private static final String SOURCES = "sources";
 
   public abstract VersionlessDependency versionless();
 
@@ -65,19 +68,32 @@ public abstract class BaseExternalDependency {
   }
 
   @Memoized
+  public String getSourceMavenCoords() {
+    return versionless().group()
+        + VersionlessDependency.COORD_DELIMITER
+        + versionless().name()
+        + VersionlessDependency.COORD_DELIMITER
+        + JAR
+        + VersionlessDependency.COORD_DELIMITER
+        + SOURCES
+        + VersionlessDependency.COORD_DELIMITER
+        + version();
+  }
+
+  @Memoized
   public String packaging() {
     return FilenameUtils.getExtension(realDependencyFile().getName());
   }
 
   @Memoized
-  public String cacheName() {
-    StringBuilder cacheName = new StringBuilder(versionless().name());
+  public String targetName() {
+    StringBuilder targetName = new StringBuilder(versionless().name());
     if (isVersioned()) {
-      cacheName.append(CACHE_DELIMITER).append(version());
+      targetName.append(NAME_DELIMITER).append(version());
     }
-    cacheName.append(versionless().classifier().map(c -> CACHE_DELIMITER + c).orElse(""));
+    targetName.append(versionless().classifier().map(c -> NAME_DELIMITER + c).orElse(""));
 
-    return cacheName.toString();
+    return targetName.toString();
   }
 
   @Memoized

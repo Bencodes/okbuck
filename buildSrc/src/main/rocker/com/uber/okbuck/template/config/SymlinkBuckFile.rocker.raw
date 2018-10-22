@@ -1,0 +1,23 @@
+@import java.util.Collection
+
+@args (
+    String base,
+    Collection targets
+)
+
+targets = [
+@for (target : sorted(targets)) {
+    '@target',
+}
+]
+
+bash_list = (
+    ["mkdir -p $OUT{}; ".format("@base")] +
+    ['cp $(location {}) $OUT{}/{};'.format(target, "@base", target[target.index(':') + 1:]) for target in targets]
+)
+
+genrule(
+    name = '@name',
+    bash = " ".join(bash_list),
+    out = "."
+)

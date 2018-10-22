@@ -1,11 +1,15 @@
 package com.uber.okbuck.core.dependency;
 
+import static com.uber.okbuck.core.dependency.BaseExternalDependency.AAR;
+import static com.uber.okbuck.core.dependency.BaseExternalDependency.JAR;
+
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.uber.okbuck.extension.ExternalDependenciesExtension;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
@@ -18,15 +22,12 @@ import org.gradle.api.artifacts.Dependency;
  * filesystem
  */
 public final class ExternalDependency {
-
-  public static final String AAR = "aar";
-  public static final String JAR = "jar";
-
   private static final String SOURCE_FILE = "-sources.jar";
   private static final String LOCAL_DEP_VERSION = "1.0.0-LOCAL";
   private static final String LOCAL_GROUP = "local";
 
-  public final BaseExternalDependency base;
+  private final BaseExternalDependency base;
+  private final Path cachePath;
 
   @Nullable private Path realSourceFilePath;
   private boolean sourceFileInitialized;
@@ -93,29 +94,19 @@ public final class ExternalDependency {
     return this.base.getMavenCoords();
   }
 
-  /** Returns the cached base path of the dependency. */
-  public Path getBasePath() {
-    return this.base.basePath();
+  /** Returns the maven coordinates of the the dependency source. */
+  public String getSourceMavenCoords() {
+    return this.base.getSourceMavenCoords();
   }
 
-  /** Returns the rule name of the cached dependency file. */
-  public String getCacheName() {
-    return this.base.cacheName() + "." + getPackaging();
+  /** Returns the target name of the dependency. */
+  public String getTargetName() {
+    return this.base.targetName() + "." + getPackaging();
   }
 
-  /** Returns the cached file name of the artifact of the dependency. */
-  public String getDependencyFileName() {
-    return getCacheName();
-  }
-
-  /** Returns the cached file path of the artifact of the dependency. */
-  public Path getDependencyFilePath() {
-    return getBasePath().resolve(this.getCacheName());
-  }
-
-  /** Returns the cached file name of the sources jar file. */
-  public String getSourceFileName() {
-    return getSourceFileNameFrom(getDependencyFileName());
+  /** Returns the target path of the dependency. */
+  public String getTargetPath() {
+    return cachePath.resolve(this.base.basePath()).toString();
   }
 
   /**
@@ -123,13 +114,20 @@ public final class ExternalDependency {
    *
    * @param project The Project
    */
-  @Nullable
-  public Path getRealSourceFilePath(Project project) {
+  void computeSourceFilePath(Project project) {
     if (!sourceFileInitialized) {
       realSourceFilePath = computeSourceFile(project);
       sourceFileInitialized = true;
     }
-    return realSourceFilePath;
+  }
+
+  /** Gets the real sources jar file for the dependency if it exists. */
+  @Nullable
+  public File getRealSourceFile() {
+    if (realSourceFilePath != null) {
+      return realSourceFilePath.toFile();
+    }
+    return null;
   }
 
   /** Check whether the dependency has a sources jar file. */
@@ -188,6 +186,8 @@ public final class ExternalDependency {
             .setIsVersioned(extension.isVersioned(versionlessDependency))
             .setRealDependencyFile(depFile)
             .build();
+
+    this.cachePath = Paths.get(extension.getCache());
   }
 
   /**

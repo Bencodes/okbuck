@@ -1,17 +1,15 @@
 @args (
-String prebuiltType,
-String prebuilt,
-String source,
-String mavenCoords
+String mavenCoords,
+String sha256,
+String sourcesMavenCoords,
+String sourcesSha256,
 )
-@(ruleType)(
+okbuck_prebuilt(
     name = '@name',
-    @prebuiltType = '@prebuilt',
-@if (valid(source)) {
-    source_jar = '@source',
-}
-@if (valid(mavenCoords)) {
     maven_coords = '@mavenCoords',
+    sha256 = '@sha256',
+@if (valid(sourcesMavenCoords)) {
+    sources_maven_coords = '@sourcesMavenCoords',
+    sources_sha256 = '@sourcesSha256',
 }
-    visibility = ['PUBLIC'],
 )

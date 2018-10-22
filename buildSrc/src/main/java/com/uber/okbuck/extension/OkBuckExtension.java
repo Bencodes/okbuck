@@ -80,9 +80,6 @@ public class OkBuckExtension {
   /** Forces okbuck to fail if the project is using dynamic or snapshot dependencies */
   @Input public boolean failOnChangingDependencies = false;
 
-  /** Specifies the folder where all external dependency rules gets generated. */
-  @Input public String externalDependencyCache = ".okbuck/ext";
-
   /** The prebuilt buck binary to use */
   @Input
   public String buckBinary =

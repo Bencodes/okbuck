@@ -1,5 +1,8 @@
 package com.uber.okbuck.core.model.base;
 
+import static com.uber.okbuck.core.dependency.BaseExternalDependency.AAR;
+import static com.uber.okbuck.core.dependency.BaseExternalDependency.JAR;
+
 import com.android.build.api.attributes.VariantAttr;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -118,25 +121,23 @@ public class Scope {
         ProjectUtil.getDependencyCache(project));
   }
 
-  public Set<String> getExternalDeps() {
-    return external.stream().map(depCache::get).map(depCache::getPath).collect(Collectors.toSet());
+  public Set<ExternalDependency> getExternalDeps() {
+    return external.stream().map(depCache::get).collect(Collectors.toSet());
   }
 
-  public Set<String> getExternalJarDeps() {
+  public Set<ExternalDependency> getExternalJarDeps() {
     return external
         .stream()
         .map(depCache::get)
-        .filter(dependency -> dependency.getPackaging().equals(ExternalDependency.JAR))
-        .map(depCache::getPath)
+        .filter(dependency -> dependency.getPackaging().equals(JAR))
         .collect(Collectors.toSet());
   }
 
-  public Set<String> getExternalAarDeps() {
+  public Set<ExternalDependency> getExternalAarDeps() {
     return external
         .stream()
         .map(depCache::get)
-        .filter(dependency -> dependency.getPackaging().equals(ExternalDependency.AAR))
-        .map(depCache::getPath)
+        .filter(dependency -> dependency.getPackaging().equals(AAR))
         .collect(Collectors.toSet());
   }
 

@@ -1,13 +1,14 @@
 package com.uber.okbuck.composer.java;
 
-import static com.uber.okbuck.core.dependency.ExternalDependency.AAR;
-import static com.uber.okbuck.core.dependency.ExternalDependency.JAR;
+import static com.uber.okbuck.core.dependency.BaseExternalDependency.AAR;
+import static com.uber.okbuck.core.dependency.BaseExternalDependency.JAR;
 
 import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.uber.okbuck.composer.jvm.JvmBuckRuleComposer;
+import com.uber.okbuck.core.dependency.DependencyUtils;
 import com.uber.okbuck.core.dependency.ExternalDependency;
-import com.uber.okbuck.core.model.base.RuleType;
 import com.uber.okbuck.template.core.Rule;
 import com.uber.okbuck.template.java.Prebuilt;
 import java.util.Collection;
@@ -24,41 +25,30 @@ public class PrebuiltRuleComposer extends JvmBuckRuleComposer {
   public static List<Rule> compose(Collection<ExternalDependency> dependencies) {
     return dependencies
         .stream()
-        .filter(dependency -> ImmutableList.of(JAR, AAR).contains(dependency.getPackaging()))
+        .peek(
+            dependency -> {
+              if (!ImmutableSet.of(JAR, AAR).contains(dependency.getPackaging())) {
+                throw new IllegalStateException("Dependency not a valid prebuilt: " + dependency);
+              }
+            })
         .sorted(
             (o1, o2) ->
                 ComparisonChain.start()
                     .compare(o1.getPackaging(), o2.getPackaging())
-                    .compare(o1.getCacheName(), o2.getCacheName())
+                    .compare(o1.getTargetName(), o2.getTargetName())
                     .result())
         .map(
             dependency -> {
-              String source = dependency.hasSourceFile() ? dependency.getSourceFileName() : null;
-
-              RuleType ruleType;
-
-              switch (dependency.getPackaging()) {
-                case JAR:
-                  ruleType = RuleType.PREBUILT_JAR;
-                  break;
-                case AAR:
-                  ruleType = RuleType.ANDROID_PREBUILT_AAR;
-                  break;
-                default:
-                  throw new IllegalStateException("Dependency not a valid prebuilt: " + dependency);
-              }
-
-              ImmutableList.Builder<Rule> rulesBuilder = ImmutableList.builder();
-              rulesBuilder.add(
+              Prebuilt rule =
                   new Prebuilt()
-                      .prebuiltType(ruleType.getProperties().get(0))
-                      .prebuilt(dependency.getDependencyFileName())
                       .mavenCoords(dependency.getMavenCoords())
-                      .source(source)
-                      .ruleType(ruleType.getBuckName())
-                      .name(dependency.getCacheName()));
-
-              return rulesBuilder.build();
+                      .sha256(DependencyUtils.sha256(dependency.getRealDependencyFile()));
+              if (dependency.hasSourceFile()) {
+                rule.sourcesMavenCoords(dependency.getSourceMavenCoords())
+                    .sourcesSha256(DependencyUtils.sha256(dependency.getRealSourceFile()));
+              }
+              rule.name(dependency.getTargetName());
+              return ImmutableList.of(rule);
             })
         .flatMap(Collection::stream)
         .collect(Collectors.toList());

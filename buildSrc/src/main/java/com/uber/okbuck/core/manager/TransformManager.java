@@ -67,15 +67,12 @@ public final class TransformManager {
             .depCache(dependencyCache)
             .build();
 
-    ImmutableSet.Builder<String> depsBuilder =
+    dependencies =
         new ImmutableSet.Builder<String>()
-            .addAll(BuckRuleComposer.targets(transformScope.getTargetDeps()));
-
-    depsBuilder.addAll(BuckRuleComposer.external(transformScope.getExternalDeps()));
-
-    depsBuilder.add(TRANSFORM_JAR_RULE);
-
-    dependencies = depsBuilder.build();
+            .addAll(BuckRuleComposer.targets(transformScope.getTargetDeps()))
+            .addAll(BuckRuleComposer.external(transformScope.getExternalDeps()))
+            .add(TRANSFORM_JAR_RULE)
+            .build();
   }
 
   public void finalizeDependencies() {
@@ -83,7 +80,7 @@ public final class TransformManager {
 
     FileUtil.deleteQuietly(cacheDir);
 
-    if (dependencies != null) {
+    if (dependencies != null && dependencies.size() > 0) {
       cacheDir.toFile().mkdirs();
 
       copyFiles(cacheDir);
@@ -108,6 +105,7 @@ public final class TransformManager {
 
   private void composeBuckFile(Path cacheDir) {
     ImmutableList.Builder<Rule> rulesBuilder = new ImmutableList.Builder<>();
+
     if (dependencies != null) {
       rulesBuilder.add(new TransformBuckFile().transformJar(TRANSFORM_JAR).deps(dependencies));
     }

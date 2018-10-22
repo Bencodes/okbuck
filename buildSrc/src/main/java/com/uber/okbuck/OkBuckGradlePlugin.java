@@ -125,16 +125,13 @@ public class OkBuckGradlePlugin implements Plugin<Project> {
 
           // Create Dependency manager
           dependencyManager =
-              new DependencyManager(
-                  rootBuckProject,
-                  okbuckExt.externalDependencyCache,
-                  okbuckExt.getExternalDependenciesExtension());
+              new DependencyManager(rootBuckProject, okbuckExt.getExternalDependenciesExtension());
 
           // Create Lint Manager
           lintManager = new LintManager(rootBuckProject, LINT_BUCK_FILE);
 
           // Create Kotlin Manager
-          kotlinManager = new KotlinManager(rootBuckProject, okbuckExt);
+          kotlinManager = new KotlinManager(rootBuckProject);
 
           // Create Scala Manager
           scalaManager = new ScalaManager(rootBuckProject);

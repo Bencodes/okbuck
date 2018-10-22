@@ -5,6 +5,7 @@ import static com.uber.okbuck.OkBuckGradlePlugin.OKBUCK_DEFS;
 import com.google.common.collect.ImmutableList;
 import com.uber.okbuck.OkBuckGradlePlugin;
 import com.uber.okbuck.composer.base.BuckRuleComposer;
+import com.uber.okbuck.core.dependency.ExternalDependency;
 import com.uber.okbuck.core.manager.GroovyManager;
 import com.uber.okbuck.core.manager.KotlinManager;
 import com.uber.okbuck.core.manager.ScalaManager;
@@ -73,11 +74,15 @@ public class OkBuckTask extends DefaultTask {
             .stream()
             .anyMatch(project -> ProjectUtil.getType(project) == ProjectType.SCALA_LIB);
     if (hasScalaLib) {
-      Set<String> scalaDeps =
+      Set<ExternalDependency> scalaDeps =
           ProjectUtil.getScalaManager(getProject()).setupScalaHome(scalaExtension.version);
       scalaLibraryLocation =
-          BuckRuleComposer.fileRule(
-              scalaDeps.stream().filter(it -> it.contains("scala-library")).findFirst().get());
+          BuckRuleComposer.external(
+              scalaDeps
+                  .stream()
+                  .filter(it -> it.getTargetName().contains("scala-library"))
+                  .findFirst()
+                  .get());
     } else {
       scalaLibraryLocation = "";
     }
@@ -89,8 +94,8 @@ public class OkBuckTask extends DefaultTask {
 
     generate(
         okBuckExtension,
-        hasGroovyLib ? GroovyManager.GROOVY_HOME_LOCATION : null,
-        kotlinExtension.version != null ? KotlinManager.KOTLIN_HOME_LOCATION : null,
+        hasGroovyLib ? GroovyManager.GROOVY_HOME_TARGET : null,
+        kotlinExtension.version != null ? KotlinManager.KOTLIN_HOME_TARGET : null,
         hasScalaLib ? ScalaManager.SCALA_COMPILER_LOCATION : null,
         hasScalaLib ? scalaLibraryLocation : null);
   }
@@ -145,7 +150,7 @@ public class OkBuckTask extends DefaultTask {
         .classpathMacro(CLASSPATH_ABI_MACRO)
         .lintJvmArgs(okbuckExt.getLintExtension().jvmArgs)
         .enableLint(!okbuckExt.getLintExtension().disabled)
-        .externalDependencyCache(okbuckExt.externalDependencyCache)
+        .externalDependencyCache(okbuckExt.getExternalDependenciesExtension().getCache())
         .classpathExclusionRegex(okbuckExt.getLintExtension().classpathExclusionRegex)
         .useCompilationClasspath(okbuckExt.getLintExtension().useCompilationClasspath)
         .render(okbuckDefs());
